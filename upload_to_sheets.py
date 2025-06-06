@@ -14,7 +14,7 @@ sweep_configs = [
 # Authenticate with Google Sheets API
 scope = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 try:
-    creds = ServiceAccountCredentials.from_json_keyfile_name("sarvam-api-load-test-97edf974c22f.json", scope)
+    creds = ServiceAccountCredentials.from_json_keyfile_name("sarvam-api-load-test-98f6c79a21c5.json", scope)
     client = gspread.authorize(creds)
 except FileNotFoundError:
     print("Error: 'credentials.json' not found. Ensure it is in the project directory.")

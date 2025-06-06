@@ -1,0 +1,13 @@
+{
+  "type": "service_account",
+  "project_id": "sarvam-api-load-test",
+  "private_key_id": "98f6c79a21c5ef8e5950ae08aee238b55d3dc84c",
+  "private_key": "-----BEGIN PRIVATE KEY-----\nMIIEvgIBADANBgkqhkiG9w0BAQEFAASCBKgwggSkAgEAAoIBAQCgryyHlZsAcOS7\njRn8Z9XsIaLwUzsOfajZJAAcYklZofCjIF5N/HbdNbd13ZJNqZCwi3+mI1b2Sksr\n7lNO/c5+pt4RxaXE4SbZdc7OkRoylQKFNeD2dyhdcaUKoKKpi6P6PxibnQ9DLeBN\n+JqfkzCXCiUsxKs7Vv8/D2d5k3L+bnbYtkAoddSh9rUMQEviYkuaKhzDLxtUjCWU\nuTxBCS/uM65EJgw3DmQYRXbvdIbBA19KnhIw70A9cfVG+/N++hNMYQQB/k2lY/VJ\nSrIWQs9Kw8UZXe1HLFQ0pN1Sk4cTB/tcj5gUXnyVkJ74ippEN60EA1g3h4C30LPX\n6ZdcJ1W9AgMBAAECggEABpcAkMPwMi2vF8kC5JDem1tKyyfir2a0Zslc7s0SHIix\nbYM9kt20g0B5eG5AmopGepMSBl6DKcEkwZW52W67ygJub5SnRoKEXR1BgMO/Kw1k\n59Esm3cKEwD+54dsfF8Td8cgK3uevV7TiOcV8k7vSnZ6TVJ4gkvAVpX7ZKdJK0mM\nUhEFp7Tnku3C8TAkikVXmw4QQItfj5aN6YxsiR8HwAK8xN22+fGlcYr0o3XawvIJ\nQa1bBp15JAOOhGzFdyHmIWI/zffKesorYy1+BA6sPmtaxRirl4WnlgvRk0ysuXcW\nX6EQe07sm+lMBKhd1IBGZhDoORA4TvQCjW+EXimKeQKBgQDVwRDbetNwrGba8Pq0\nHFCmPjV76IVirbvrkJH9FEm8jxng+7CCLpMht1nKAAWG3N4AkBD0KMSsr8nycbkr\nzi3+6l99NwZzNR0I79lEHb274m1UVhWouxgYkQ27I3Eqa6FuMLgbvoXmuQ6R9RGk\nodpENkj2hhEoS9CWcrNUx65pKQKBgQDAcQbJNqQyforvbD9bNHKSS7lCnu5iYqc5\nB7eDmv1ry6LJualkcW6UDwSQufP9peveh6GNYN15MeooOB+e3NaIIOqHv5nTYfO1\nSZJ2Oo49C6crBd2Y2KJUw91Fdjxu+cJuuB9i9tKFcmlvq3/FVTRwXfloVulkYfgd\nETKQbWHWdQKBgQDNWwhI872C9/5wxSb2NmW88PMNMZxD60kozOGUVBNrFcf0/5jZ\n2Mj9kVqv2El3AWY/AClpiGk6xj+rrloJnbFOv/gxIdYOhK56UYNYD4KiqKwEZBe2\n3NgPcfvRGAG2kWSrqh6WePnHaW54BwuGMQCym7yJKs/8+KlSgKuM/bGv0QKBgHkE\nWu0cFIPAeiR4IRt8zvPa9MTFZ0mtmlVN2gTD6cvpAhTzUWfdwVkQXKGanqoKtlp5\nVomuuXfmgMcMDC5919dBQ9tcDSMV/QkrHBSHXD1dX6G5jZH54ZOGnFZ7NSPgonm4\nBdzZNKhAu7dC1RXGMDTdk+MejKTYywuUbgTPFHClAoGBAJPv8LVLr+xW2hifXv/z\nogxwItSkMIFaQgZS9BJ/rGHQbU/V/Nk1zpS9Iia92EdrezFo4dBbTfGOyPWqFmwJ\ndIbhDOQPEGr3ig4mgyVDWNjTaPDZrRJ1fvATB7Y33QKHEbChUwLAxyhk4UouZ8Vi\niOpCadmY2RWEzg3tSPDen6bi\n-----END PRIVATE KEY-----\n",
+  "client_email": "sarvam-load-test-service-accou@sarvam-api-load-test.iam.gserviceaccount.com",
+  "client_id": "116951410607424300015",
+  "auth_uri": "https://accounts.google.com/o/oauth2/auth",
+  "token_uri": "https://oauth2.googleapis.com/token",
+  "auth_provider_x509_cert_url": "https://www.googleapis.com/oauth2/v1/certs",
+  "client_x509_cert_url": "https://www.googleapis.com/robot/v1/metadata/x509/sarvam-load-test-service-accou%40sarvam-api-load-test.iam.gserviceaccount.com",
+  "universe_domain": "googleapis.com"
+}

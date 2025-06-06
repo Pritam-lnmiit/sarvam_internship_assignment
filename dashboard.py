@@ -5,11 +5,11 @@ import os
 import time
 import re
 
-# Streamlit page configuration
+# Page configuration
 st.set_page_config(page_title="Sarvam API Load Test Dashboard", layout="wide")
 st.title("Sarvam Transliteration API Load Test Dashboard")
 
-# Test Configuration
+# Input fields
 st.header("Test Configuration")
 col1, col2, col3 = st.columns(3)
 with col1:
@@ -19,105 +19,137 @@ with col2:
 with col3:
     run_time = st.text_input("Run Time (e.g., 30s, 1m)", value="30s")
 
-# Validate run_time format (e.g., 30s, 1m, 5m)
 def validate_run_time(run_time):
-    pattern = r"^\d+[sm]$"
-    return bool(re.match(pattern, run_time))
+    return bool(re.match(r"^\d+[smh]$", run_time))
 
-# Button to Trigger Locust Test
+# Check for required files
+required_files = ["locustfile.py", "analyze_results.py"]
+for file in required_files:
+    if not os.path.exists(file):
+        st.error(f"{file} not found. Please ensure it exists in the same directory.")
+        st.stop()
+
+# Check Locust installation
+try:
+    result = subprocess.run(["locust", "--version"], capture_output=True, text=True, check=True)
+    st.info(f"Locust version: {result.stdout.strip()}")
+except subprocess.CalledProcessError:
+    st.error("Locust is not installed or not found in PATH. Install it using 'pip install locust'.")
+    st.stop()
+
+# Check .env file
+if not os.path.exists(".env"):
+    st.error("'.env' file not found. Please create it with SARVAM_API_KEY.")
+    st.stop()
+
+# Run Load Test button
 if st.button("Run Load Test"):
     if not validate_run_time(run_time):
-        st.error("Invalid Run Time format. Use format like '30s' or '1m'.")
+        st.error("Invalid Run Time format. Use '30s', '1m', or '1h'.")
         st.stop()
+
+    csv_prefix = f"locust_stats_{int(time.time())}"
+    cmd = [
+        "locust", "-f", "locustfile.py", "--headless",
+        "-u", str(concurrency), "-r", str(spawn_rate),
+        "-t", run_time, "--host=https://api.sarvam.ai",
+        f"--csv={csv_prefix}"
+    ]
 
     with st.spinner("Running Locust test..."):
-        # Run Locust test
-        csv_prefix = f"locust_stats_{int(time.time())}"
-        cmd = [
-            "locust",
-            "-f", "locustfile.py",
-            "--headless",
-            "-u", str(concurrency),
-            "-r", str(spawn_rate),
-            "-t", run_time,
-            "--host=https://api.sarvam.ai",
-            f"--csv={csv_prefix}"
-        ]
         try:
-            result = subprocess.run(cmd, capture_output=True, text=True, check=True)
-            st.success("Locust test completed successfully!")
-        except subprocess.CalledProcessError as e:
-            st.error(f"Locust test failed: {e.stderr}")
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            st.subheader("Locust Output")
+            st.code(result.stdout)
+            if result.stderr:
+                st.subheader("Locust Error Output")
+                st.code(result.stderr)
+
+            if result.returncode == 0:
+                st.success("Locust test completed successfully.")
+            elif "Type" in result.stdout and "# reqs" in result.stdout:
+                st.warning(f"Locust ran but exited with code {result.returncode}. Some requests were sent. Check error output above.")
+            else:
+                st.error(f"Locust failed with exit code {result.returncode}. No requests were sent.")
+                st.code(result.stderr)
+                st.stop()
+        except subprocess.TimeoutExpired:
+            st.error("Locust test timed out after 10 minutes.")
             st.stop()
 
-        # Run analysis
-        with st.spinner("Running analysis..."):
-            try:
-                result = subprocess.run(["python", "analyze_results.py"], capture_output=True, text=True, check=True)
-                st.success("Analysis completed. Metrics and charts generated.")
-            except subprocess.CalledProcessError as e:
-                st.error(f"Analysis failed: {e.stderr}")
-                st.stop()
+    with st.spinner("Running analysis..."):
+        try:
+            result = subprocess.run(["python", "analyze_results.py"], capture_output=True, text=True, check=True)
+            st.success("Analysis completed. Metrics and charts generated.")
+            st.code(result.stdout)
+        except subprocess.CalledProcessError as e:
+            st.error(f"Analysis failed:\n{e.stderr}")
+            st.stop()
 
-    # Display Metrics
-    st.header("Test Results")
-    try:
-        if os.path.exists("language_metrics.csv"):
-            language_metrics = pd.read_csv("language_metrics.csv")
+# Display Metrics
+st.header("Test Results")
+try:
+    if os.path.exists("language_metrics.csv"):
+        language_metrics = pd.read_csv("language_metrics.csv")
+        if language_metrics.empty:
+            st.warning("language_metrics.csv is empty.")
+        else:
             st.subheader("Language-wise Metrics")
             st.dataframe(language_metrics)
-        else:
-            st.warning("language_metrics.csv not found. Ensure analysis ran successfully.")
+    else:
+        st.warning("language_metrics.csv not found.")
 
-        if os.path.exists("aggregate_metrics.csv"):
-            aggregate_metrics = pd.read_csv("aggregate_metrics.csv")
+    if os.path.exists("aggregate_metrics.csv"):
+        aggregate_metrics = pd.read_csv("aggregate_metrics.csv")
+        if aggregate_metrics.empty:
+            st.warning("aggregate_metrics.csv is empty.")
+        else:
             st.subheader("Aggregate Metrics")
             st.dataframe(aggregate_metrics)
-        else:
-            st.warning("aggregate_metrics.csv not found. Ensure analysis ran successfully.")
+    else:
+        st.warning("aggregate_metrics.csv not found.")
 
-        # Display Latency by Language Plot
-        st.subheader("Latency by Language")
-        if os.path.exists("latency_by_language.png"):
-            st.image("latency_by_language.png", caption="p95, p75, p50 Latency by Language")
-        else:
-            st.warning("Latency by Language plot not found.")
+    st.subheader("Latency by Language")
+    if os.path.exists("latency_by_language.png"):
+        st.image("latency_by_language.png", caption="Latency (p95, p75, p50) by Language")
+    else:
+        st.warning("latency_by_language.png not found.")
 
-        # Display p95 Latency by Concurrency
-        if os.path.exists("p95_by_concurrency.png"):
-            st.subheader("p95 Latency by Concurrency")
-            st.image("p95_by_concurrency.png", caption="p95 Latency Across Concurrency Levels")
-        else:
-            st.warning("p95 by Concurrency plot not found. Run sweep configurations to generate.")
+    st.subheader("p95 Latency by Concurrency")
+    if os.path.exists("p95_by_concurrency.png"):
+        st.image("p95_by_concurrency.png", caption="p95 Latency Across Concurrency Levels")
+    else:
+        st.warning("p95_by_concurrency.png not found.")
 
-    except Exception as e:
-        st.error(f"Error loading results: {e}")
-        st.stop()
+except Exception as e:
+    st.error(f"Error loading results: {e}")
 
-# Button to Upload to Google Sheets
+# Upload to Google Sheets
 st.header("Upload to Google Sheets")
 if st.button("Upload Results to Google Sheets"):
+    if not os.path.exists("upload_to_sheets.py"):
+        st.error("upload_to_sheets.py not found.")
+        st.stop()
     with st.spinner("Uploading to Google Sheets..."):
         try:
             result = subprocess.run(["python", "upload_to_sheets.py"], capture_output=True, text=True, check=True)
             st.success("Results uploaded to Google Sheets.")
-            st.markdown("**Note**: Share the Google Sheet with public viewer access and include the link in your submission.")
+            st.code(result.stdout)
         except subprocess.CalledProcessError as e:
             st.error(f"Upload failed: {e.stderr}")
-            st.stop()
-        except FileNotFoundError:
-            st.error("Error: 'upload_to_sheets.py' not found in the project directory.")
-            st.stop()
 
 # Instructions
 st.header("Instructions")
-st.write("""
-1. Enter concurrency, spawn rate, and run time (e.g., '30s' or '1m').
-2. Click 'Run Load Test' to execute the Locust test for the Transliteration API.
-3. View results and charts below.
-4. Click 'Upload to Google Sheets' to update the Google Sheet.
-5. In Google Sheets, add:
-   - Bar Chart: Latency Metrics by Language (p95, p75, p50).
-   - Line Chart: p95 Latency Across Concurrency Levels.
-6. Share the Google Sheet with public viewer access.
+st.markdown("""
+1. Ensure Locust is installed (`pip install locust`) and `locustfile.py` is configured correctly.
+2. Create a `.env` file with `SARVAM_API_KEY=your_api_key_here`.
+3. Enter concurrency, spawn rate, and run time (e.g., '30s', '1m', '1h').
+4. Click 'Run Load Test' to test the Transliteration API.
+5. Check the Locust output and error output for issues if no requests are sent.
+6. View metrics and plots in the 'Test Results' section.
+7. Click 'Upload Results to Google Sheets' to sync.
+8. In the Google Sheet:
+   - Create Bar Chart: Latency Metrics by Language (p95, p75, p50)
+   - Create Line Chart: p95 Latency Across Concurrency Levels
+9. Share Google Sheet with public viewer access.
 """)
