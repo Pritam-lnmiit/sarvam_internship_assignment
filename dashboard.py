@@ -4,6 +4,7 @@ import pandas as pd
 import os
 import time
 import re
+from dotenv import load_dotenv
 
 # Page configuration
 st.set_page_config(page_title="Sarvam API Load Test Dashboard", layout="wide")
@@ -11,13 +12,15 @@ st.title("Sarvam Transliteration API Load Test Dashboard")
 
 # Input fields
 st.header("Test Configuration")
-col1, col2, col3 = st.columns(3)
+col1, col2, col3, col4 = st.columns(4)
 with col1:
     concurrency = st.number_input("Concurrency", min_value=1, value=1, step=1)
 with col2:
     spawn_rate = st.number_input("Spawn Rate", min_value=1, value=1, step=1)
 with col3:
     run_time = st.text_input("Run Time (e.g., 30s, 1m)", value="30s")
+with col4:
+    api_key = st.text_input("Sarvam API Key", type="password", help="Enter your Sarvam API key. If not provided, the key from .env file will be used.")
 
 def validate_run_time(run_time):
     return bool(re.match(r"^\d+[smh]$", run_time))
@@ -37,16 +40,27 @@ except subprocess.CalledProcessError:
     st.error("Locust is not installed or not found in PATH. Install it using 'pip install locust'.")
     st.stop()
 
-# Check .env file
-if not os.path.exists(".env"):
-    st.error("'.env' file not found. Please create it with SARVAM_API_KEY.")
+# Check .env file as fallback if API key not provided
+if not api_key and not os.path.exists(".env"):
+    st.error("No API key provided and '.env' file not found. Please provide an API key or create a .env file with SARVAM_API_KEY.")
     st.stop()
+
+# Load .env file as fallback if API key not provided
+if not api_key:
+    load_dotenv()
+    api_key = os.getenv("SARVAM_API_KEY")
+    if not api_key:
+        st.error("No API key provided and SARVAM_API_KEY not found in .env file.")
+        st.stop()
 
 # Run Load Test button
 if st.button("Run Load Test"):
     if not validate_run_time(run_time):
         st.error("Invalid Run Time format. Use '30s', '1m', or '1h'.")
         st.stop()
+
+    # Set SARVAM_API_KEY environment variable for Locust
+    os.environ["SARVAM_API_KEY"] = api_key
 
     csv_prefix = f"locust_stats_{int(time.time())}"
     cmd = [
@@ -142,7 +156,7 @@ if st.button("Upload Results to Google Sheets"):
 st.header("Instructions")
 st.markdown("""
 1. Ensure Locust is installed (`pip install locust`) and `locustfile.py` is configured correctly.
-2. Create a `.env` file with `SARVAM_API_KEY=your_api_key_here`.
+2. Enter your Sarvam API key in the text field above, or create a `.env` file with `SARVAM_API_KEY=your_api_key_here`.
 3. Enter concurrency, spawn rate, and run time (e.g., '30s', '1m', '1h').
 4. Click 'Run Load Test' to test the Transliteration API.
 5. Check the Locust output and error output for issues if no requests are sent.
