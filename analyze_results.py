@@ -1,25 +1,31 @@
+import sys
+import io
 import pandas as pd
 import matplotlib.pyplot as plt
 import numpy as np
+import seaborn as sns
 
-# Load language-specific results
+# Set UTF-8 encoding for stdout to prevent encoding errors
+sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+
+# Load test results
 try:
     results_df = pd.read_csv("locust_results.csv")
 except FileNotFoundError:
     print("Error: 'locust_results.csv' not found. Run locustfile.py first.")
-    exit(1)
+    sys.exit(1)
 
-# Validate results_df
 if results_df.empty:
     print("Error: 'locust_results.csv' is empty. Ensure Locust test generated valid data.")
-    exit(1)
+    sys.exit(1)
+
 required_columns = ["language", "latency_ms", "error", "timestamp"]
 missing_columns = [col for col in required_columns if col not in results_df.columns]
 if missing_columns:
     print(f"Error: 'locust_results.csv' missing columns: {missing_columns}")
-    exit(1)
+    sys.exit(1)
 
-# Calculate language-wise metrics, replacing NaN with 0
+# Calculate per-language metrics
 language_metrics = results_df.groupby("language").agg({
     "latency_ms": [
         "mean",
@@ -29,47 +35,36 @@ language_metrics = results_df.groupby("language").agg({
     ],
     "error": "mean"
 }).reset_index()
-language_metrics.columns = ["Language", "Avg Latency (ms)", "p95 Latency (ms)", "p75 Latency (ms)", "p50 Latency (ms)", "Error Rate"]
-language_metrics["Error Rate"] = language_metrics["Error Rate"] * 100
+language_metrics.columns = [
+    "Language", "Avg Latency (ms)", "p95 Latency (ms)",
+    "p75 Latency (ms)", "p50 Latency (ms)", "Error Rate"
+]
+language_metrics["Error Rate"] *= 100
 language_metrics = language_metrics.fillna(0)
 
-# Load aggregate metrics from Locust stats or compute from results
+# Aggregate metrics
 try:
-    stats_df = pd.read_csv("locust_stats_stats.csv")
-    if stats_df.empty or "Name" not in stats_df.columns or "Aggregated" not in stats_df["Name"].values:
-        print("Warning: 'locust_stats_stats.csv' is empty or missing 'Aggregated' row. Computing from locust_results.csv.")
-        raise FileNotFoundError
+    time_diff = (
+        pd.to_datetime(results_df["timestamp"], errors="coerce").max() -
+        pd.to_datetime(results_df["timestamp"], errors="coerce").min()
+    ).total_seconds()
     aggregate_metrics = {
-        "p95 Latency (ms)": stats_df[stats_df["Name"] == "Aggregated"]["95%"].iloc[0] if not stats_df.empty else 0,
-        "p75 Latency (ms)": stats_df[stats_df["Name"] == "Aggregated"]["75%"].iloc[0] if not stats_df.empty else 0,
-        "p50 Latency (ms)": stats_df[stats_df["Name"] == "Aggregated"]["50%"].iloc[0] if not stats_df.empty else 0,
-        "Avg Response Time (ms)": stats_df[stats_df["Name"] == "Aggregated"]["Average Response Time"].iloc[0] if not stats_df.empty else 0,
-        "RPS": stats_df[stats_df["Name"] == "Aggregated"]["Requests/s"].iloc[0] if not stats_df.empty else 0,
-        "Error Rate (%)": stats_df[stats_df["Name"] == "Aggregated"]["Failure %"].iloc[0] if not stats_df.empty else 0
+        "p95 Latency (ms)": results_df["latency_ms"].quantile(0.95),
+        "p75 Latency (ms)": results_df["latency_ms"].quantile(0.75),
+        "p50 Latency (ms)": results_df["latency_ms"].quantile(0.50),
+        "Avg Response Time (ms)": results_df["latency_ms"].mean(),
+        "RPS": len(results_df) / time_diff if time_diff > 0 else 0,
+        "Error Rate (%)": results_df["error"].mean() * 100
     }
-except FileNotFoundError:
-    print("locust_stats_stats.csv not found or invalid. Computing aggregate metrics from locust_results.csv.")
-    try:
-        time_diff = (
-            pd.to_datetime(results_df["timestamp"], errors="coerce").max() - 
-            pd.to_datetime(results_df["timestamp"], errors="coerce").min()
-        ).total_seconds()
-        aggregate_metrics = {
-            "p95 Latency (ms)": results_df["latency_ms"].quantile(0.95) if not results_df["latency_ms"].dropna().empty else 0,
-            "p75 Latency (ms)": results_df["latency_ms"].quantile(0.75) if not results_df["latency_ms"].dropna().empty else 0,
-            "p50 Latency (ms)": results_df["latency_ms"].quantile(0.50) if not results_df["latency_ms"].dropna().empty else 0,
-            "Avg Response Time (ms)": results_df["latency_ms"].mean() if not results_df["latency_ms"].dropna().empty else 0,
-            "RPS": len(results_df) / time_diff if time_diff > 0 else 0,
-            "Error Rate (%)": results_df["error"].mean() * 100 if not results_df.empty else 0
-        }
-    except Exception as e:
-        print(f"Error computing aggregate metrics: {e}")
-        exit(1)
+except Exception as e:
+    print(f"Error computing aggregate metrics: {e}")
+    sys.exit(1)
 
 # Plot 1: Latency by Language
 plt.figure(figsize=(12, 6))
-for metric in ["p95 Latency (ms)", "p75 Latency (ms)", "p50 Latency (ms)"]:
-    plt.plot(language_metrics["Language"], language_metrics[metric], marker="o", label=metric)
+sns.barplot(data=language_metrics, x="Language", y="p95 Latency (ms)", color="red", label="p95", alpha=0.8)
+sns.barplot(data=language_metrics, x="Language", y="p75 Latency (ms)", color="blue", label="p75", alpha=0.5)
+sns.barplot(data=language_metrics, x="Language", y="p50 Latency (ms)", color="green", label="p50", alpha=0.3)
 plt.title("Latency Metrics by Language")
 plt.xlabel("Language")
 plt.ylabel("Latency (ms)")
@@ -79,26 +74,32 @@ plt.tight_layout()
 plt.savefig("latency_by_language.png")
 plt.close()
 
-# Plot 2: p95 Latency Across Configurations (for sweep)
+# Plot 2: Sweep Config Performance
 sweep_configs = [
-    {"concurrency": 1, "spawn_rate": 1, "run_time": "1m"},
-    {"concurrency": 5, "spawn_rate": 2, "run_time": "1m"},
-    {"concurrency": 10, "spawn_rate": 2, "run_time": "3m"},
-    {"concurrency": 25, "spawn_rate": 4, "run_time": "5m"}
+    {"concurrency": 1},
+    {"concurrency": 5},
+    {"concurrency": 10},
+    {"concurrency": 25}
 ]
 config_metrics = []
 for i, config in enumerate(sweep_configs):
     try:
         config_df = pd.read_csv(f"locust_stats_config_{i}_stats.csv")
         if not config_df.empty and "Name" in config_df.columns and "Aggregated" in config_df["Name"].values:
-            config_metrics.append({
-                "Concurrency": config["concurrency"],
-                "p95 Latency (ms)": config_df[config_df["Name"] == "Aggregated"]["95%"].iloc[0]
-            })
+            p95_value = config_df[config_df["Name"] == "Aggregated"]["95%"].iloc[0]
+            if pd.notna(p95_value):  # Ensure p95 value is not NaN
+                config_metrics.append({
+                    "Concurrency": config["concurrency"],
+                    "p95 Latency (ms)": p95_value
+                })
+            else:
+                print(f"Warning: No valid p95 latency in locust_stats_config_{i}_stats.csv.")
         else:
-            print(f"Warning: locust_stats_config_{i}_stats.csv is empty or invalid. Skipping.")
+            print(f"Warning: locust_stats_config_{i}_stats.csv invalid or missing 'Aggregated' row.")
     except FileNotFoundError:
-        print(f"locust_stats_config_{i}_stats.csv not found. Skipping configuration {i}.")
+        print(f"Warning: locust_stats_config_{i}_stats.csv not found. Skipping.")
+
+# Generate p95_by_concurrency.png
 if config_metrics:
     config_df = pd.DataFrame(config_metrics)
     plt.figure(figsize=(10, 5))
@@ -106,11 +107,25 @@ if config_metrics:
     plt.title("p95 Latency Across Concurrency Levels")
     plt.xlabel("Concurrency")
     plt.ylabel("p95 Latency (ms)")
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig("p95_by_concurrency.png")
+    plt.close()
+else:
+    # Fallback: Use single-run data from locust_results.csv
+    print("Warning: No valid concurrency sweep data found. Generating p95_by_concurrency.png with single-run data.")
+    plt.figure(figsize=(10, 5))
+    plt.plot([1], [aggregate_metrics["p95 Latency (ms)"]], marker="o")
+    plt.title("p95 Latency Across Concurrency Levels (Single Run)")
+    plt.xlabel("Concurrency")
+    plt.ylabel("p95 Latency (ms)")
+    plt.grid(True)
     plt.tight_layout()
     plt.savefig("p95_by_concurrency.png")
     plt.close()
 
-# Save metrics for Google Sheets
+# Save results
 language_metrics.to_csv("language_metrics.csv", index=False)
 pd.DataFrame([aggregate_metrics]).to_csv("aggregate_metrics.csv", index=False)
 print("Metrics saved to language_metrics.csv and aggregate_metrics.csv")
+print("Plots saved to latency_by_language.png and p95_by_concurrency.png")
