@@ -1,0 +1,9 @@
+locust
+streamlit
+pandas
+matplotlib
+gspread
+oauth2client 
+sarvamai
+numpy
+python-dotenv
